@@ -14,9 +14,11 @@ import (
 	"time"
 )
 
+var DefaultDecoder = NewDecoder(nil)
+
 // NewDecoder returns a new form Decoder.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, defaultDelimiter, defaultEscape, false, false}
+	return &Decoder{r, defaultDelimiter, defaultEscape, false, false, defaultUseJSONTags}
 }
 
 // Decoder decodes data from a form (application/x-www-form-urlencoded).
@@ -26,6 +28,7 @@ type Decoder struct {
 	e             rune
 	ignoreUnknown bool
 	ignoreCase    bool
+	useJSONTags   bool
 }
 
 // DelimitWith sets r as the delimiter used for composite keys by Decoder d and returns the latter; it is '.' by default.
@@ -37,6 +40,12 @@ func (d *Decoder) DelimitWith(r rune) *Decoder {
 // EscapeWith sets r as the escape used for delimiters (and to escape itself) by Decoder d and returns the latter; it is '\\' by default.
 func (d *Decoder) EscapeWith(r rune) *Decoder {
 	d.e = r
+	return d
+}
+
+// UseJSONTags sets whether the Decodeer should use `json` tags in struct field names if no `form` tag is present.
+func (d *Decoder) UseJSONTags(useJSONTags bool) *Decoder {
+	d.useJSONTags = useJSONTags
 	return d
 }
 
@@ -84,12 +93,12 @@ func (d Decoder) DecodeValues(dst interface{}, vs url.Values) error {
 
 // DecodeString decodes src into dst.
 func DecodeString(dst interface{}, src string) error {
-	return NewDecoder(nil).DecodeString(dst, src)
+	return DefaultDecoder.DecodeString(dst, src)
 }
 
 // DecodeValues decodes vs into dst.
 func DecodeValues(dst interface{}, vs url.Values) error {
-	return NewDecoder(nil).DecodeValues(dst, vs)
+	return DefaultDecoder.DecodeValues(dst, vs)
 }
 
 func (d Decoder) decodeNode(v reflect.Value, n node) (err error) {
@@ -166,7 +175,7 @@ func (d Decoder) decodeValue(v reflect.Value, x interface{}) {
 func (d Decoder) decodeStruct(v reflect.Value, x interface{}) {
 	t := v.Type()
 	for k, c := range getNode(x) {
-		if f, ok := findField(v, k, d.ignoreCase); !ok && k == "" {
+		if f, ok := findField(v, k, d.ignoreCase, d.useJSONTags); !ok && k == "" {
 			panic(getString(x) + " cannot be decoded as " + t.String())
 		} else if !ok {
 			if !d.ignoreUnknown {

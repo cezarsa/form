@@ -11,4 +11,6 @@ const (
 
 	defaultDelimiter = '.'
 	defaultEscape    = '\\'
+
+	defaultUseJSONTags = true
 )
